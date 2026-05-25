@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0914" />
+    <title>Orbe | Trajetória Diplomática</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="backdrop" aria-hidden="true">
+      <span class="glow glow-primary"></span>
+      <span class="glow glow-violet"></span>
+      <span class="grid-floor"></span>
+    </div>
+
+    <section class="auth-screen" id="authScreen">
+      <div class="auth-brand">
+        <span class="brand-mark"><span></span></span>
+        <div>
+          <p>ORBE</p>
+          <small>JORNADA CACD</small>
+        </div>
+      </div>
+      <div class="auth-layout">
+        <article class="auth-intro">
+          <p class="signal"><span></span> TRAJETÓRIA PRIVADA</p>
+          <h1>Seu plano diplomático,<br />salvo em cada etapa.</h1>
+          <p>
+            Metas do CACD, graduação, idiomas e desenvolvimento pessoal
+            sincronizadas com segurança na sua conta.
+          </p>
+          <div class="auth-features">
+            <span>Dados privados</span>
+            <span>Progresso sincronizado</span>
+            <span>Acesso em qualquer dispositivo</span>
+          </div>
+        </article>
+
+        <article class="auth-card">
+          <div class="auth-tabs" id="authTabs">
+            <button class="is-active" data-auth-mode="login" type="button">Entrar</button>
+            <button data-auth-mode="register" type="button">Criar conta</button>
+          </div>
+          <div class="setup-alert is-hidden" id="setupAlert">
+            Configure o banco seguro para ativar contas e sincronização.
+            Consulte o arquivo <strong>README.md</strong> ou
+            <a href="?preview=1">abra uma pré-visualização</a>.
+          </div>
+          <form class="auth-form" id="authForm">
+            <div class="auth-heading">
+              <p class="eyebrow" id="authEyebrow">BEM-VINDO DE VOLTA</p>
+              <h2 id="authTitle">Acessar sua jornada</h2>
+            </div>
+            <label id="authEmailField">
+              E-mail
+              <input name="email" type="email" autocomplete="email" required placeholder="voce@email.com" />
+            </label>
+            <label>
+              <span id="passwordFieldLabel">Senha</span>
+              <input name="password" type="password" autocomplete="current-password" minlength="8" required placeholder="Mínimo de 8 caracteres" />
+            </label>
+            <button class="primary-button auth-submit" id="authSubmit" type="submit">Entrar</button>
+            <button class="text-button" id="resetPasswordButton" type="button">
+              Esqueci minha senha
+            </button>
+            <p class="auth-feedback" id="authFeedback" aria-live="polite"></p>
+          </form>
+          <p class="auth-security">
+            Seu CPF não é solicitado. Identificação sensível não deve funcionar como senha.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <div class="app-shell is-hidden" id="appShell">
+      <aside class="sidebar" aria-label="Navegação principal">
+        <div class="brand">
+          <span class="brand-mark"><span></span></span>
+          <div>
+            <p>ORBE</p>
+            <small>JORNADA CACD</small>
+          </div>
+        </div>
+
+        <nav class="navigation" id="categoryNav">
+          <p class="nav-label">Eixos</p>
+          <button class="nav-item is-active" type="button" data-category="Todas">
+            <span class="nav-dot"></span><span class="nav-text">Visão geral</span>
+            <strong id="countTodas">0</strong>
+          </button>
+          <button class="nav-item" type="button" data-category="CACD">
+            <span class="nav-dot cacd"></span><span class="nav-text">CACD</span>
+            <strong id="countCACD">0</strong>
+          </button>
+          <button class="nav-item" type="button" data-category="Graduacao">
+            <span class="nav-dot graduation"></span><span class="nav-text">Graduação</span>
+            <strong id="countGraduacao">0</strong>
+          </button>
+          <button class="nav-item" type="button" data-category="Idiomas">
+            <span class="nav-dot languages"></span><span class="nav-text">Idiomas</span>
+            <strong id="countIdiomas">0</strong>
+          </button>
+          <button class="nav-item" type="button" data-category="Repertorio">
+            <span class="nav-dot repertoire"></span><span class="nav-text">Repertório</span>
+            <strong id="countRepertorio">0</strong>
+          </button>
+          <button class="nav-item" type="button" data-category="Desenvolvimento">
+            <span class="nav-dot development"></span><span class="nav-text">Desenvolvimento</span>
+            <strong id="countDesenvolvimento">0</strong>
+          </button>
+        </nav>
+
+        <article class="cycle-card">
+          <div class="cycle-head">
+            <span class="pulse"></span>
+            FORMAÇÃO INICIAL
+          </div>
+          <p class="cycle-stage">2º SEMESTRE DE R.I.</p>
+          <p class="cycle-year" id="cycleYear">2026</p>
+          <p class="cycle-copy">
+            Base acadêmica e pessoal para uma carreira diplomática.
+          </p>
+        </article>
+
+        <button class="ghost-button reset-button" id="restoreButton" type="button">
+          Recomeçar do zero
+        </button>
+      </aside>
+
+      <main class="dashboard">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="todayLabel">PAINEL DE FORMAÇÃO</p>
+            <h1>Trajetória diplomática</h1>
+          </div>
+          <div class="topbar-actions">
+            <span class="sync-pill" id="syncPill" data-state="saved">
+              <span></span><strong id="syncLabel">Salvo</strong>
+            </span>
+            <button class="ghost-button" id="routineButton" type="button">
+              <span>+</span> Nova rotina
+            </button>
+            <button class="primary-button" id="goalButton" type="button">
+              <span>+</span> Novo objetivo
+            </button>
+            <button class="account-button" id="accountButton" type="button" aria-label="Sair da conta">
+              <span id="userInitial">U</span>
+              <small id="userEmail">conta</small>
+              Sair
+            </button>
+          </div>
+        </header>
+
+        <section class="hero" aria-label="Resumo de progresso">
+          <div class="hero-copy">
+            <p class="signal"><span></span> PROJETO DIPLOMACIA</p>
+            <h2>Rumo ao CACD.<br />Formação com método.</h2>
+            <p>
+              Organize a graduação, o repertório e a disciplina pessoal
+              que sustentam uma preparação de longo prazo.
+            </p>
+          </div>
+          <div class="hero-progress">
+            <div class="orbital-ring" id="overallRing">
+              <div>
+                <strong id="overallProgress">0%</strong>
+                <span>progresso médio</span>
+              </div>
+            </div>
+            <div class="hero-side">
+              <div>
+                <small>Prioridade em destaque</small>
+                <strong id="spotlightTitle">-</strong>
+              </div>
+              <div class="mini-track">
+                <span id="spotlightBar"></span>
+              </div>
+              <p id="spotlightCaption">Nenhum objetivo registrado.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="stats-grid" aria-label="Indicadores">
+          <article class="stat-card">
+            <span class="stat-icon target"></span>
+            <div>
+              <p>Metas ativas</p>
+              <strong id="activeGoals">0</strong>
+            </div>
+            <small id="completedLabel">0 concluídas</small>
+          </article>
+          <article class="stat-card">
+            <span class="stat-icon clock"></span>
+            <div>
+              <p>Próximo marco</p>
+              <strong id="nextReview">--</strong>
+            </div>
+            <small id="nextReviewTitle">sem prazo</small>
+          </article>
+          <article class="stat-card">
+            <span class="stat-icon bolt"></span>
+            <div>
+              <p>Disciplina hoje</p>
+              <strong id="routineDone">0/0</strong>
+            </div>
+            <small id="routineStatus">Comece o dia</small>
+          </article>
+          <article class="stat-card accent">
+            <span class="stat-icon wave"></span>
+            <div>
+              <p>Registros de avanço</p>
+              <strong id="totalUpdates">0</strong>
+            </div>
+            <small>histórico preservado</small>
+          </article>
+        </section>
+
+        <div class="content-grid">
+          <section class="goals-panel" aria-label="Seus objetivos">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">PLANO DE FORMAÇÃO</p>
+                <h2>Metas estratégicas</h2>
+              </div>
+              <label class="search-field">
+                <span aria-hidden="true"></span>
+                <input id="goalSearch" type="search" placeholder="Buscar objetivo" />
+              </label>
+            </div>
+            <div class="range-tabs" id="horizonTabs" aria-label="Filtrar periodo">
+              <button class="is-active" data-horizon="Todos" type="button">Todos</button>
+              <button data-horizon="Medio prazo" type="button">Médio prazo</button>
+              <button data-horizon="Longo prazo" type="button">Longo prazo</button>
+            </div>
+            <div class="goal-list" id="goalList"></div>
+          </section>
+
+          <aside class="side-column">
+            <section class="routines-panel" aria-label="Rotinas">
+              <div class="section-heading compact">
+                <div>
+                  <p class="eyebrow">DISCIPLINA</p>
+                  <h2>Rotinas de hoje</h2>
+                </div>
+                <span class="date-pill" id="shortDate">--</span>
+              </div>
+              <div class="routine-list" id="routineList"></div>
+            </section>
+
+            <section class="timeline-panel" aria-label="Prazos">
+              <div class="section-heading compact">
+                <div>
+                  <p class="eyebrow">AGENDA</p>
+                  <h2>Próximos marcos</h2>
+                </div>
+              </div>
+              <div class="deadline-list" id="deadlineList"></div>
+            </section>
+          </aside>
+        </div>
+      </main>
+    </div>
+
+    <div class="drawer-backdrop" id="drawerBackdrop"></div>
+    <aside class="detail-drawer" id="detailDrawer" aria-label="Detalhes do objetivo" aria-hidden="true">
+      <button class="icon-close" id="closeDrawer" type="button" aria-label="Fechar detalhes">
+        &times;
+      </button>
+      <div id="goalDetails"></div>
+    </aside>
+
+    <dialog class="modal" id="goalModal">
+      <form class="modal-form" id="newGoalForm" method="dialog">
+        <div class="modal-head">
+          <div>
+            <p class="eyebrow">NOVO OBJETIVO</p>
+            <h2>Criar objetivo</h2>
+          </div>
+          <button class="icon-close" data-close-modal="goalModal" type="button" aria-label="Cancelar">&times;</button>
+        </div>
+        <label>
+          Nome do objetivo
+          <input name="title" required placeholder="Ex.: Fichar História do Brasil" />
+        </label>
+        <div class="form-pair">
+          <label>
+            Categoria
+            <select name="category">
+              <option>CACD</option>
+              <option value="Graduacao">Graduação</option>
+              <option>Idiomas</option>
+              <option value="Repertorio">Repertório</option>
+              <option>Desenvolvimento</option>
+            </select>
+          </label>
+          <label>
+            Horizonte
+            <select name="horizon">
+              <option value="Medio prazo">Médio prazo</option>
+              <option>Longo prazo</option>
+            </select>
+          </label>
+        </div>
+        <label>
+          Tipo de acompanhamento
+          <select name="strategy">
+            <option value="total">Acumular entregas (fichamentos, aulas, simulados)</option>
+            <option value="target">Alcançar medição (nota, nível, horas)</option>
+          </select>
+        </label>
+        <div class="form-triple">
+          <label>
+            Atual
+            <input name="current" type="number" step="0.1" value="0" required />
+          </label>
+          <label>
+            Alvo
+            <input name="target" type="number" step="0.1" min="0.1" required placeholder="24" />
+          </label>
+          <label>
+            Unidade
+            <input name="unit" required placeholder="fichamentos" />
+          </label>
+        </div>
+        <div class="form-pair">
+          <label>
+            Prazo
+            <input name="deadline" type="date" required />
+          </label>
+          <label>
+            Cor de sinal
+            <select name="color">
+              <option value="#a78bfa">Violeta institucional</option>
+              <option value="#c4b5fd">Lavanda</option>
+              <option value="#8b5cf6">Púrpura</option>
+              <option value="#7c6fd0">Índigo</option>
+            </select>
+          </label>
+        </div>
+        <label>
+          Marcos intermediários
+          <input name="milestones" placeholder="Ex.: Ciclo inicial, Revisão, Simulado" />
+        </label>
+        <div class="modal-actions">
+          <button class="ghost-button" data-close-modal="goalModal" type="button">Cancelar</button>
+          <button class="primary-button" type="submit">Criar objetivo</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="modal small" id="routineModal">
+      <form class="modal-form" id="newRoutineForm" method="dialog">
+        <div class="modal-head">
+          <div>
+            <p class="eyebrow">NOVA ROTINA</p>
+            <h2>Criar ritual</h2>
+          </div>
+          <button class="icon-close" data-close-modal="routineModal" type="button" aria-label="Cancelar">&times;</button>
+        </div>
+        <label>
+          Rotina
+          <input name="title" required placeholder="Ex.: Revisar atualidades internacionais" />
+        </label>
+        <div class="form-pair">
+          <label>
+            Frequência
+            <select name="frequency">
+              <option value="semana">Por semana</option>
+              <option value="mes">Por mes</option>
+            </select>
+          </label>
+          <label>
+            Meta de vezes
+            <input name="target" type="number" min="1" value="3" required />
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button class="ghost-button" data-close-modal="routineModal" type="button">Cancelar</button>
+          <button class="primary-button" type="submit">Criar rotina</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="modal small" id="restoreModal">
+      <div class="modal-form">
+        <div class="modal-head">
+          <div>
+            <p class="eyebrow">RECOMEÇAR PLANO</p>
+            <h2>Zerar seu progresso?</h2>
+          </div>
+          <button class="icon-close" data-close-modal="restoreModal" type="button" aria-label="Cancelar">&times;</button>
+        </div>
+        <p class="warning-copy">
+          Todas as atualizações e check-ins da sua conta serão apagados. Os objetivos-base continuarão disponíveis em 0%.
+        </p>
+        <div class="modal-actions">
+          <button class="ghost-button" data-close-modal="restoreModal" type="button">Cancelar</button>
+          <button class="danger-button" id="confirmRestore" type="button">Zerar progresso</button>
+        </div>
+      </div>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
