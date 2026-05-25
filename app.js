@@ -28,6 +28,7 @@ const starterState = {
       target: 10,
       deadline: `${currentYear + 2}-12-15`,
       color: "#a78bfa",
+      priority: "essencial",
       summary: "Preparação gradual, alinhada à graduação em Relações Internacionais.",
       milestones: [
         { title: "Mapear áreas e bibliografia-base", done: false },
@@ -48,6 +49,7 @@ const starterState = {
       target: 5,
       deadline: `${currentYear}-07-10`,
       color: "#c4b5fd",
+      priority: "alta",
       summary: "A base universitária bem construída dá profundidade à futura preparação.",
       milestones: [
         { title: "Cronograma acadêmico organizado", done: false },
@@ -68,6 +70,7 @@ const starterState = {
       target: 120,
       deadline: `${currentYear + 1}-12-15`,
       color: "#8b5cf6",
+      priority: "alta",
       summary: "Leitura, escrita e conversação voltadas a temas internacionais.",
       milestones: [
         { title: "Rotina semanal estabelecida", done: false },
@@ -88,6 +91,7 @@ const starterState = {
       target: 24,
       deadline: `${currentYear}-12-12`,
       color: "#b68cff",
+      priority: "alta",
       summary: "Repertório organizado para compreender cenários, autores e posições brasileiras.",
       milestones: [
         { title: "Primeiros seis fichamentos", done: false },
@@ -108,6 +112,7 @@ const starterState = {
       target: 32,
       deadline: `${currentYear + 1}-06-30`,
       color: "#9275d8",
+      priority: "constante",
       summary: "Comunicação clara, repertório pessoal e segurança para expor ideias.",
       milestones: [
         { title: "Primeira redação revisada", done: false },
@@ -132,10 +137,13 @@ let selectedCategory = "Todas";
 let selectedHorizon = "Todos";
 let searchTerm = "";
 let authMode = "login";
-let isSaving = false;
 let sessionLoadPromise = null;
 let toastTimer;
 let displayedOverall = 0;
+let pendingDeletion = null;
+let stateRevision = 0;
+let saveQueue = Promise.resolve();
+let lastSavedState = cloneStarterState();
 
 const elements = {
   authScreen: document.querySelector("#authScreen"),
@@ -158,6 +166,7 @@ const elements = {
   spotlightTitle: document.querySelector("#spotlightTitle"),
   spotlightBar: document.querySelector("#spotlightBar"),
   spotlightCaption: document.querySelector("#spotlightCaption"),
+  heroGoalCount: document.querySelector("#heroGoalCount"),
   activeGoals: document.querySelector("#activeGoals"),
   completedLabel: document.querySelector("#completedLabel"),
   nextReview: document.querySelector("#nextReview"),
@@ -165,6 +174,11 @@ const elements = {
   routineDone: document.querySelector("#routineDone"),
   routineStatus: document.querySelector("#routineStatus"),
   totalUpdates: document.querySelector("#totalUpdates"),
+  cadencePercent: document.querySelector("#cadencePercent"),
+  cadenceCaption: document.querySelector("#cadenceCaption"),
+  cadenceBar: document.querySelector("#cadenceBar"),
+  cadenceMetrics: document.querySelector("#cadenceMetrics"),
+  activityFeed: document.querySelector("#activityFeed"),
   categoryNav: document.querySelector("#categoryNav"),
   horizonTabs: document.querySelector("#horizonTabs"),
   goalSearch: document.querySelector("#goalSearch"),
@@ -180,10 +194,20 @@ const elements = {
   restoreButton: document.querySelector("#restoreButton"),
   goalModal: document.querySelector("#goalModal"),
   routineModal: document.querySelector("#routineModal"),
+  deleteModal: document.querySelector("#deleteModal"),
   restoreModal: document.querySelector("#restoreModal"),
+  deleteTitle: document.querySelector("#deleteTitle"),
+  deleteCopy: document.querySelector("#deleteCopy"),
+  confirmDelete: document.querySelector("#confirmDelete"),
   confirmRestore: document.querySelector("#confirmRestore"),
   newGoalForm: document.querySelector("#newGoalForm"),
   newRoutineForm: document.querySelector("#newRoutineForm"),
+  goalModalEyebrow: document.querySelector("#goalModalEyebrow"),
+  goalModalTitle: document.querySelector("#goalModalTitle"),
+  goalSubmitLabel: document.querySelector("#goalSubmitLabel"),
+  routineModalEyebrow: document.querySelector("#routineModalEyebrow"),
+  routineModalTitle: document.querySelector("#routineModalTitle"),
+  routineSubmitLabel: document.querySelector("#routineSubmitLabel"),
   syncPill: document.querySelector("#syncPill"),
   syncLabel: document.querySelector("#syncLabel"),
   accountButton: document.querySelector("#accountButton"),
@@ -198,6 +222,33 @@ function cloneStarterState() {
 
 function validState(value) {
   return value && Array.isArray(value.goals) && Array.isArray(value.routines);
+}
+
+function defaultPriority(goal) {
+  if (goal.category === "CACD") return "essencial";
+  if (goal.category === "Graduacao" || goal.category === "Idiomas") return "alta";
+  return "constante";
+}
+
+function normalizeState(value) {
+  if (!validState(value)) return cloneStarterState();
+  return {
+    goals: value.goals.map((goal) => ({
+      ...goal,
+      priority: ["essencial", "alta", "constante"].includes(goal.priority) ? goal.priority : defaultPriority(goal),
+      summary: goal.summary || "Objetivo pessoal pronto para registrar avanços.",
+      current: Number(goal.current) || 0,
+      target: Number(goal.target) || 1,
+      baseline: Number.isFinite(Number(goal.baseline)) ? Number(goal.baseline) : goal.strategy === "target" ? Number(goal.current) || 0 : 0,
+      milestones: Array.isArray(goal.milestones) ? goal.milestones : [],
+      entries: Array.isArray(goal.entries) ? goal.entries : []
+    })),
+    routines: value.routines.map((routine) => ({
+      ...routine,
+      target: Math.max(1, Number(routine.target) || 1),
+      dates: Array.isArray(routine.dates) ? routine.dates : []
+    }))
+  };
 }
 
 function dateToKey(date) {
@@ -258,8 +309,21 @@ function horizonLabel(horizon) {
   return horizon === "Medio prazo" ? "Médio prazo" : horizon;
 }
 
+function priorityLabel(priority) {
+  return { essencial: "Essencial", alta: "Alta", constante: "Constante" }[priority] || "Constante";
+}
+
+function priorityScore(priority) {
+  return { essencial: 3, alta: 2, constante: 1 }[priority] || 0;
+}
+
 function daysUntil(key) {
   return Math.ceil((parseDate(key).getTime() - parseDate(todayKey).getTime()) / 86400000);
+}
+
+function readableActivityDate(key) {
+  if (key === todayKey) return "Hoje";
+  return formatDate(key, { day: "2-digit", month: "short" });
 }
 
 function setSyncStatus(status, label) {
@@ -321,7 +385,10 @@ function renderOverview(animate = true) {
   const percentages = state.goals.map(progressFor);
   const overall = percentages.length ? Math.round(percentages.reduce((sum, item) => sum + item, 0) / percentages.length) : 0;
   const completed = percentages.filter((item) => item === 100).length;
-  const spotlight = [...state.goals].sort((a, b) => progressFor(b) - progressFor(a))[0];
+  const outstanding = state.goals.filter((goal) => progressFor(goal) < 100);
+  const spotlight = [...(outstanding.length ? outstanding : state.goals)].sort((a, b) => {
+    return priorityScore(b.priority) - priorityScore(a.priority) || daysUntil(a.deadline) - daysUntil(b.deadline);
+  })[0];
   const next = [...state.goals]
     .filter((goal) => daysUntil(goal.deadline) >= 0)
     .sort((a, b) => parseDate(a.deadline) - parseDate(b.deadline))[0];
@@ -337,16 +404,18 @@ function renderOverview(animate = true) {
   elements.routineDone.textContent = `${checkedToday}/${state.routines.length}`;
   elements.routineStatus.textContent = checkedToday === state.routines.length && state.routines.length ? "Dia completo" : "check-ins de hoje";
   elements.totalUpdates.textContent = state.goals.reduce((total, goal) => total + goal.entries.length, 0);
+  elements.heroGoalCount.textContent = `${state.goals.length} objetivo${state.goals.length === 1 ? "" : "s"} monitorado${state.goals.length === 1 ? "" : "s"}`;
 
   if (spotlight) {
     const spotlightProgress = progressFor(spotlight);
     elements.spotlightTitle.textContent = spotlight.title;
     elements.spotlightBar.style.width = "0%";
     elements.spotlightBar.dataset.fill = spotlightProgress;
-    elements.spotlightCaption.textContent = `${spotlightProgress}% concluído - ${valueLabel(spotlight)}`;
+    elements.spotlightCaption.textContent = `${priorityLabel(spotlight.priority)} · ${spotlightProgress}% concluído · ${valueLabel(spotlight)}`;
   } else {
     elements.spotlightTitle.textContent = "-";
     elements.spotlightBar.style.width = "0%";
+    elements.spotlightBar.dataset.fill = 0;
     elements.spotlightCaption.textContent = "Crie seu primeiro objetivo.";
   }
 
@@ -358,7 +427,8 @@ function filteredGoals() {
   return state.goals.filter((goal) => {
     const categoryMatches = selectedCategory === "Todas" || goal.category === selectedCategory;
     const horizonMatches = selectedHorizon === "Todos" || goal.horizon === selectedHorizon;
-    const searchMatches = goal.title.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchable = `${goal.title} ${goal.summary || ""}`.toLowerCase();
+    const searchMatches = searchable.includes(searchTerm.toLowerCase());
     return categoryMatches && horizonMatches && searchMatches;
   });
 }
@@ -378,9 +448,12 @@ function renderGoals() {
             <span class="goal-symbol">${escapeHtml(iconFor(goal.category))}</span>
             <div>
               <h3>${escapeHtml(goal.title)}</h3>
-              <p>${escapeHtml(horizonLabel(goal.horizon))} - até ${escapeHtml(formatDate(goal.deadline, {
-                day: "2-digit", month: "short", year: "numeric"
-              }))}</p>
+              <div class="goal-meta">
+                <span class="priority-chip" data-priority="${escapeHtml(goal.priority)}">${escapeHtml(priorityLabel(goal.priority))}</span>
+                <p>${escapeHtml(horizonLabel(goal.horizon))} · ${escapeHtml(formatDate(goal.deadline, {
+                  day: "2-digit", month: "short", year: "numeric"
+                }))}</p>
+              </div>
             </div>
           </div>
           <div class="goal-track">
@@ -389,7 +462,10 @@ function renderGoals() {
           </div>
           <div class="goal-percent">
             <strong>${progress}%</strong>
-            <button class="open-goal" data-open-goal="${goal.id}" type="button">Atualizar</button>
+            <div class="goal-card-actions">
+              <button class="open-goal" data-open-goal="${goal.id}" type="button">Abrir</button>
+              <button class="edit-goal" data-edit-goal="${goal.id}" type="button">Editar</button>
+            </div>
           </div>
         </article>`;
     })
@@ -401,13 +477,57 @@ function datesInPeriod(routine) {
   if (routine.frequency === "mes") {
     return routine.dates.filter((key) => {
       const date = parseDate(key);
-      return date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
+      return date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear() && key <= todayKey;
     });
   }
   const weekDay = (start.getDay() + 6) % 7;
   start.setDate(start.getDate() - weekDay);
   start.setHours(0, 0, 0, 0);
-  return routine.dates.filter((key) => parseDate(key) >= start && parseDate(key) <= today);
+  const startKey = dateToKey(start);
+  return routine.dates.filter((key) => key >= startKey && key <= todayKey);
+}
+
+function renderIntelligence() {
+  const completedCheckins = state.routines.reduce((sum, routine) => sum + Math.min(datesInPeriod(routine).length, routine.target), 0);
+  const expectedCheckins = state.routines.reduce((sum, routine) => sum + routine.target, 0);
+  const cadence = expectedCheckins ? Math.round((completedCheckins / expectedCheckins) * 100) : 0;
+
+  elements.cadencePercent.textContent = `${cadence}%`;
+  elements.cadenceCaption.textContent = expectedCheckins
+    ? `${completedCheckins} de ${expectedCheckins} check-ins cumpridos nos ciclos atuais.`
+    : "Crie rotinas para formar seu ritmo de preparação.";
+  elements.cadenceBar.style.width = "0%";
+  elements.cadenceBar.dataset.fill = cadence;
+  elements.cadenceMetrics.innerHTML = state.routines.length
+    ? state.routines.slice(0, 3).map((routine) => {
+      const count = datesInPeriod(routine).length;
+      return `<span><strong>${Math.min(count, routine.target)}/${routine.target}</strong>${escapeHtml(routine.title)}</span>`;
+    }).join("")
+    : '<p class="empty-copy">Sem rotinas ativas.</p>';
+
+  const activities = state.goals.flatMap((goal) => goal.entries.map((entry) => ({
+    date: entry.date,
+    type: "evolucao",
+    title: goal.title,
+    detail: entry.note
+  }))).concat(state.routines.flatMap((routine) => routine.dates.map((date) => ({
+    date,
+    type: "checkin",
+    title: routine.title,
+    detail: "Check-in de rotina concluído."
+  })))).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4);
+
+  elements.activityFeed.innerHTML = activities.length
+    ? activities.map((activity) => `
+        <article class="activity-item" data-kind="${activity.type}">
+          <span class="activity-node"></span>
+          <div>
+            <strong>${escapeHtml(activity.title)}</strong>
+            <p>${escapeHtml(activity.detail)}</p>
+          </div>
+          <time>${escapeHtml(readableActivityDate(activity.date))}</time>
+        </article>`).join("")
+    : '<div class="empty-feed">Seu primeiro avanço aparecerá aqui.</div>';
 }
 
 function renderRoutines() {
@@ -427,7 +547,11 @@ function renderRoutines() {
             <strong>${escapeHtml(routine.title)}</strong>
             <span>${count} de ${routine.target} ${routine.frequency === "mes" ? "neste mês" : "nesta semana"}</span>
           </div>
-          <span class="routine-streak">${checked ? "feito" : `${count}/${routine.target}`}</span>
+          <div class="routine-manage">
+            <span class="routine-streak">${checked ? "feito" : `${count}/${routine.target}`}</span>
+            <button data-edit-routine="${routine.id}" type="button">Editar</button>
+            <button data-delete-routine="${routine.id}" type="button">Excluir</button>
+          </div>
         </article>`;
     })
     .join("");
@@ -462,7 +586,13 @@ function renderDrawer() {
     .sort((a, b) => parseDate(b.date) - parseDate(a.date) || b.index - a.index);
   elements.goalDetails.innerHTML = `
     <header class="drawer-header" style="--goal-color: ${goal.color}">
-      <span class="tag">${escapeHtml(categoryLabel(goal.category))} / ${escapeHtml(horizonLabel(goal.horizon))}</span>
+      <div class="drawer-toolbar">
+        <span class="tag">${escapeHtml(categoryLabel(goal.category))} / ${escapeHtml(horizonLabel(goal.horizon))} / ${escapeHtml(priorityLabel(goal.priority))}</span>
+        <div>
+          <button class="drawer-action" data-edit-goal="${goal.id}" type="button">Editar</button>
+          <button class="drawer-action is-danger" data-delete-goal="${goal.id}" type="button">Excluir</button>
+        </div>
+      </div>
       <h2>${escapeHtml(goal.title)}</h2>
       <p>${escapeHtml(goal.summary || "Registre cada passo relevante deste objetivo.")}</p>
     </header>
@@ -482,10 +612,10 @@ function renderDrawer() {
     <section class="detail-block">
       <h3>Marcos intermediários</h3>
       <div class="milestone-list">
-        ${goal.milestones.map((milestone, index) => `
+        ${goal.milestones.length ? goal.milestones.map((milestone, index) => `
           <button type="button" class="milestone ${milestone.done ? "is-done" : ""}" data-toggle-milestone="${index}">
             <span></span>${escapeHtml(milestone.title)}
-          </button>`).join("")}
+          </button>`).join("") : '<p class="empty-inline">Edite a meta para incluir marcos.</p>'}
       </div>
     </section>
     <section class="detail-block">
@@ -499,6 +629,7 @@ function renderDrawer() {
                 <span>${escapeHtml(number(entry.value))} ${escapeHtml(goal.unit)}</span></strong>
               <p>${escapeHtml(entry.note)}</p>
             </div>
+            <button class="history-delete" data-delete-entry="${entry.index}" type="button" aria-label="Excluir registro">Excluir</button>
           </article>`).join("") : '<p class="empty-state">Comece registrando sua primeira evolução.</p>'}
       </div>
     </section>`;
@@ -508,6 +639,7 @@ function renderAll(animate = true) {
   renderDateLabels();
   renderCategoryCounts();
   renderOverview(animate);
+  renderIntelligence();
   renderGoals();
   renderRoutines();
   renderDeadlines();
@@ -544,38 +676,42 @@ function resetFilters() {
   });
 }
 
-async function saveRemoteState() {
+async function saveRemoteState(nextState = state) {
   if (PREVIEW_MODE) {
-    setSyncStatus("preview", "Prévia");
     return;
   }
   if (!supabase || !session?.user) throw new Error("Sessão indisponível.");
   const { error } = await supabase
     .from("user_plans")
-    .upsert({ user_id: session.user.id, state }, { onConflict: "user_id" });
+    .upsert({ user_id: session.user.id, state: nextState }, { onConflict: "user_id" });
   if (error) throw error;
-  setSyncStatus("saved", "Salvo na nuvem");
 }
 
-async function mutateState(mutation, successMessage) {
-  if (isSaving) return;
-  const previous = structuredClone(state);
+function mutateState(mutation, successMessage) {
   mutation();
+  const revision = ++stateRevision;
+  const nextState = structuredClone(state);
   renderAll();
-  isSaving = true;
-  setSyncStatus("saving", "Salvando");
-  try {
-    await saveRemoteState();
-    showToast(PREVIEW_MODE ? "Alteração apenas na pré-visualização." : successMessage);
-  } catch (error) {
-    state = previous;
-    renderAll();
-    setSyncStatus("error", "Não salvo");
-    showToast("Não foi possível salvar. Verifique sua conexão.", "error");
-    console.error(error);
-  } finally {
-    isSaving = false;
-  }
+  setSyncStatus(PREVIEW_MODE ? "preview" : "saving", PREVIEW_MODE ? "Prévia" : "Salvando");
+  saveQueue = saveQueue.then(async () => {
+    try {
+      await saveRemoteState(nextState);
+      lastSavedState = structuredClone(nextState);
+      if (revision === stateRevision) {
+        setSyncStatus(PREVIEW_MODE ? "preview" : "saved", PREVIEW_MODE ? "Prévia" : "Salvo na nuvem");
+        showToast(PREVIEW_MODE ? "Alteração apenas na pré-visualização." : successMessage);
+      }
+    } catch (error) {
+      if (revision === stateRevision) {
+        state = structuredClone(lastSavedState);
+        renderAll();
+        setSyncStatus("error", "Não salvo");
+        showToast("Não foi possível salvar. Verifique sua conexão.", "error");
+      }
+      console.error(error);
+    }
+  });
+  return saveQueue;
 }
 
 async function loadRemotePlan() {
@@ -586,8 +722,9 @@ async function loadRemotePlan() {
     .eq("user_id", session.user.id)
     .maybeSingle();
   if (error) throw error;
-  state = validState(data?.state) ? data.state : cloneStarterState();
+  state = data ? normalizeState(data.state) : cloneStarterState();
   if (!data) await saveRemoteState();
+  lastSavedState = structuredClone(state);
   setSyncStatus("saved", "Salvo na nuvem");
 }
 
@@ -706,50 +843,128 @@ async function sendPasswordReset() {
   setAuthFeedback(error ? error.message : "Enviamos o link de recuperação para seu e-mail.", Boolean(error));
 }
 
-function addGoal(form) {
+function milestoneValues(data, existing = []) {
+  const priorMilestones = new Map(existing.map((milestone) => [milestone.title.toLowerCase(), milestone.done]));
+  const milestones = data.get("milestones").split(",").map((item) => item.trim()).filter(Boolean).map((title) => ({
+    title,
+    done: priorMilestones.get(title.toLowerCase()) || false
+  }));
+  return milestones.length ? milestones : [{ title: "Primeiro registro de progresso", done: false }];
+}
+
+function openNewGoal() {
+  elements.newGoalForm.reset();
+  elements.newGoalForm.elements.recordId.value = "";
+  elements.newGoalForm.elements.current.value = 0;
+  elements.newGoalForm.elements.deadline.value = `${currentYear}-12-31`;
+  elements.newGoalForm.elements.priority.value = "alta";
+  elements.goalModalEyebrow.textContent = "NOVO OBJETIVO";
+  elements.goalModalTitle.textContent = "Criar objetivo";
+  elements.goalSubmitLabel.textContent = "Criar objetivo";
+  elements.goalModal.showModal();
+}
+
+function openEditGoal(id) {
+  const goal = state.goals.find((item) => item.id === id);
+  if (!goal) return;
+  const form = elements.newGoalForm.elements;
+  form.recordId.value = goal.id;
+  form.title.value = goal.title;
+  form.category.value = goal.category;
+  form.horizon.value = goal.horizon;
+  form.summary.value = goal.summary || "";
+  form.priority.value = goal.priority || defaultPriority(goal);
+  form.strategy.value = goal.strategy;
+  form.current.value = goal.current;
+  form.target.value = goal.target;
+  form.unit.value = goal.unit;
+  form.deadline.value = goal.deadline;
+  form.color.value = goal.color;
+  form.milestones.value = goal.milestones.map((milestone) => milestone.title).join(", ");
+  elements.goalModalEyebrow.textContent = "EDITAR OBJETIVO";
+  elements.goalModalTitle.textContent = "Ajustar estratégia";
+  elements.goalSubmitLabel.textContent = "Salvar alterações";
+  elements.goalModal.showModal();
+}
+
+function saveGoal(form) {
   const data = new FormData(form);
   const title = data.get("title").trim();
   const current = Number(data.get("current"));
-  const milestones = data.get("milestones").split(",").map((item) => item.trim()).filter(Boolean).map((titleValue) => ({
-    title: titleValue,
-    done: false
-  }));
+  const id = data.get("recordId");
+  const existing = state.goals.find((goal) => goal.id === id);
+  const milestones = milestoneValues(data, existing?.milestones);
   return mutateState(() => {
-    state.goals.unshift({
-      id: `goal-${crypto.randomUUID()}`,
+    const values = {
       title,
       category: data.get("category"),
       horizon: data.get("horizon"),
       strategy: data.get("strategy"),
       unit: data.get("unit").trim(),
       current,
-      baseline: data.get("strategy") === "target" ? current : 0,
       target: Number(data.get("target")),
       deadline: data.get("deadline"),
       color: data.get("color"),
-      summary: "Objetivo pessoal pronto para registrar avanços.",
-      milestones: milestones.length ? milestones : [{ title: "Primeiro registro de progresso", done: false }],
-      entries: current ? [{ date: todayKey, value: current, note: "Valor inicial informado." }] : []
-    });
+      priority: data.get("priority"),
+      summary: data.get("summary").trim(),
+      milestones
+    };
+    if (existing) {
+      const previousCurrent = existing.current;
+      const strategyChanged = existing.strategy !== values.strategy;
+      Object.assign(existing, values);
+      if (strategyChanged) existing.baseline = values.strategy === "target" ? current : 0;
+      if (previousCurrent !== current) {
+        existing.entries.push({ date: todayKey, value: current, note: "Valor ajustado na edição do objetivo." });
+      }
+    } else {
+      state.goals.unshift({
+        id: `goal-${crypto.randomUUID()}`,
+        ...values,
+        baseline: values.strategy === "target" ? current : 0,
+        entries: current ? [{ date: todayKey, value: current, note: "Valor inicial informado." }] : []
+      });
+    }
     elements.goalModal.close();
     form.reset();
-  }, `Objetivo criado: ${title}`);
+  }, existing ? "Objetivo atualizado." : `Objetivo criado: ${title}`);
 }
 
-function addRoutine(form) {
+function openNewRoutine() {
+  elements.newRoutineForm.reset();
+  elements.newRoutineForm.elements.recordId.value = "";
+  elements.newRoutineForm.elements.target.value = 3;
+  elements.routineModalEyebrow.textContent = "NOVA ROTINA";
+  elements.routineModalTitle.textContent = "Criar ritual";
+  elements.routineSubmitLabel.textContent = "Criar rotina";
+  elements.routineModal.showModal();
+}
+
+function openEditRoutine(id) {
+  const routine = state.routines.find((item) => item.id === id);
+  if (!routine) return;
+  const form = elements.newRoutineForm.elements;
+  form.recordId.value = routine.id;
+  form.title.value = routine.title;
+  form.frequency.value = routine.frequency;
+  form.target.value = routine.target;
+  elements.routineModalEyebrow.textContent = "EDITAR ROTINA";
+  elements.routineModalTitle.textContent = "Ajustar ritual";
+  elements.routineSubmitLabel.textContent = "Salvar alterações";
+  elements.routineModal.showModal();
+}
+
+function saveRoutine(form) {
   const data = new FormData(form);
   const title = data.get("title").trim();
+  const existing = state.routines.find((routine) => routine.id === data.get("recordId"));
   return mutateState(() => {
-    state.routines.unshift({
-      id: `routine-${crypto.randomUUID()}`,
-      title,
-      frequency: data.get("frequency"),
-      target: Number(data.get("target")),
-      dates: []
-    });
+    const values = { title, frequency: data.get("frequency"), target: Number(data.get("target")) };
+    if (existing) Object.assign(existing, values);
+    else state.routines.unshift({ id: `routine-${crypto.randomUUID()}`, ...values, dates: [] });
     elements.routineModal.close();
     form.reset();
-  }, `Rotina criada: ${title}`);
+  }, existing ? "Rotina atualizada." : `Rotina criada: ${title}`);
 }
 
 function updateGoal(form) {
@@ -775,6 +990,50 @@ function toggleRoutine(id) {
     if (index >= 0) routine.dates.splice(index, 1);
     else routine.dates.push(todayKey);
   }, "Check-in salvo.");
+}
+
+function requestDeletion(type, id, index = null) {
+  pendingDeletion = { type, id, index };
+  if (type === "goal") {
+    const goal = state.goals.find((item) => item.id === id);
+    elements.deleteTitle.textContent = "Excluir objetivo?";
+    elements.deleteCopy.textContent = `A meta "${goal?.title || ""}" e todo o seu histórico serão removidos permanentemente.`;
+  } else if (type === "routine") {
+    const routine = state.routines.find((item) => item.id === id);
+    elements.deleteTitle.textContent = "Excluir rotina?";
+    elements.deleteCopy.textContent = `A rotina "${routine?.title || ""}" e seus check-ins serão removidos permanentemente.`;
+  } else {
+    elements.deleteTitle.textContent = "Excluir atualização?";
+    elements.deleteCopy.textContent = "Este registro sairá do histórico e o valor atual da meta voltará ao último registro disponível.";
+  }
+  elements.deleteModal.showModal();
+}
+
+function recalculateCurrentValue(goal) {
+  const mostRecent = goal.entries
+    .map((entry, index) => ({ ...entry, index }))
+    .sort((a, b) => b.date.localeCompare(a.date) || b.index - a.index)[0];
+  goal.current = mostRecent ? Number(mostRecent.value) : goal.strategy === "target" ? goal.baseline : 0;
+}
+
+function confirmDeletion() {
+  if (!pendingDeletion) return;
+  const removal = pendingDeletion;
+  pendingDeletion = null;
+  elements.deleteModal.close();
+  return mutateState(() => {
+    if (removal.type === "goal") {
+      state.goals = state.goals.filter((goal) => goal.id !== removal.id);
+      if (selectedGoalId === removal.id) closeDrawer();
+    } else if (removal.type === "routine") {
+      state.routines = state.routines.filter((routine) => routine.id !== removal.id);
+    } else {
+      const goal = state.goals.find((item) => item.id === removal.id);
+      if (!goal) return;
+      goal.entries.splice(removal.index, 1);
+      recalculateCurrentValue(goal);
+    }
+  }, removal.type === "entry" ? "Atualização excluída." : "Item excluído da sua jornada.");
 }
 
 elements.authTabs.addEventListener("click", (event) => {
@@ -805,12 +1064,18 @@ elements.goalSearch.addEventListener("input", (event) => {
   animateProgressTracks();
 });
 elements.goalList.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-open-goal]");
-  if (button) openDrawer(button.dataset.openGoal);
+  const editButton = event.target.closest("[data-edit-goal]");
+  const openButton = event.target.closest("[data-open-goal]");
+  if (editButton) openEditGoal(editButton.dataset.editGoal);
+  else if (openButton) openDrawer(openButton.dataset.openGoal);
 });
 elements.routineList.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-toggle-routine]");
-  if (button) void toggleRoutine(button.dataset.toggleRoutine);
+  const toggleButton = event.target.closest("[data-toggle-routine]");
+  const editButton = event.target.closest("[data-edit-routine]");
+  const deleteButton = event.target.closest("[data-delete-routine]");
+  if (toggleButton) void toggleRoutine(toggleButton.dataset.toggleRoutine);
+  else if (editButton) openEditRoutine(editButton.dataset.editRoutine);
+  else if (deleteButton) requestDeletion("routine", deleteButton.dataset.deleteRoutine);
 });
 elements.goalDetails.addEventListener("submit", (event) => {
   if (event.target.id === "updateGoalForm") {
@@ -819,21 +1084,24 @@ elements.goalDetails.addEventListener("submit", (event) => {
   }
 });
 elements.goalDetails.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-toggle-milestone]");
-  if (button) void toggleMilestone(Number(button.dataset.toggleMilestone));
+  const milestoneButton = event.target.closest("[data-toggle-milestone]");
+  const editButton = event.target.closest("[data-edit-goal]");
+  const deleteButton = event.target.closest("[data-delete-goal]");
+  const entryButton = event.target.closest("[data-delete-entry]");
+  if (milestoneButton) void toggleMilestone(Number(milestoneButton.dataset.toggleMilestone));
+  else if (editButton) openEditGoal(editButton.dataset.editGoal);
+  else if (deleteButton) requestDeletion("goal", deleteButton.dataset.deleteGoal);
+  else if (entryButton) requestDeletion("entry", selectedGoalId, Number(entryButton.dataset.deleteEntry));
 });
-elements.goalButton.addEventListener("click", () => {
-  elements.newGoalForm.elements.deadline.value = `${currentYear}-12-31`;
-  elements.goalModal.showModal();
-});
-elements.routineButton.addEventListener("click", () => elements.routineModal.showModal());
+elements.goalButton.addEventListener("click", openNewGoal);
+elements.routineButton.addEventListener("click", openNewRoutine);
 elements.newGoalForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  void addGoal(event.target);
+  void saveGoal(event.target);
 });
 elements.newRoutineForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  void addRoutine(event.target);
+  void saveRoutine(event.target);
 });
 document.querySelectorAll("[data-close-modal]").forEach((button) => {
   button.addEventListener("click", () => document.querySelector(`#${button.dataset.closeModal}`).close());
@@ -841,6 +1109,7 @@ document.querySelectorAll("[data-close-modal]").forEach((button) => {
 elements.closeDrawer.addEventListener("click", closeDrawer);
 elements.drawerBackdrop.addEventListener("click", closeDrawer);
 elements.restoreButton.addEventListener("click", () => elements.restoreModal.showModal());
+elements.confirmDelete.addEventListener("click", () => void confirmDeletion());
 elements.confirmRestore.addEventListener("click", () => {
   void mutateState(() => {
     state = cloneStarterState();

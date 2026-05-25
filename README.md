@@ -7,6 +7,8 @@ Aplicativo privado para acompanhar a formação em Relações Internacionais, pr
 - Conta individual por e-mail e senha.
 - Dados sincronizados no Supabase, isolados por usuário com Row Level Security (RLS).
 - Objetivos-base iniciando em `0%`, rotinas, marcos e histórico de evoluções.
+- Edição e exclusão de objetivos, rotinas e registros de progresso com confirmação.
+- Cadência de rotina e atividade recente para acompanhar a execução do plano.
 - Interface responsiva e animações de preenchimento de progresso.
 
 CPF não é usado para login: ele é um dado pessoal sensível na prática e não deve funcionar como credencial de acesso.

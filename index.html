@@ -18,6 +18,8 @@
       <span class="glow glow-primary"></span>
       <span class="glow glow-violet"></span>
       <span class="grid-floor"></span>
+      <span class="scan-beam"></span>
+      <span class="constellation"></span>
     </div>
 
     <section class="auth-screen" id="authScreen">
@@ -160,23 +162,28 @@
 
         <section class="hero" aria-label="Resumo de progresso">
           <div class="hero-copy">
-            <p class="signal"><span></span> PROJETO DIPLOMACIA</p>
+            <p class="signal"><span></span> ORBE // PROTOCOLO DIPLOMACIA</p>
             <h2>Rumo ao CACD.<br />Formação com método.</h2>
             <p>
               Organize a graduação, o repertório e a disciplina pessoal
               que sustentam uma preparação de longo prazo.
             </p>
+            <div class="mission-tags" aria-label="Sistemas ativos">
+              <span><i></i> Plano sincronizado</span>
+              <span>R.I. + CACD</span>
+              <span id="heroGoalCount">0 objetivos monitorados</span>
+            </div>
           </div>
           <div class="hero-progress">
             <div class="orbital-ring" id="overallRing">
               <div>
                 <strong id="overallProgress">0%</strong>
-                <span>progresso médio</span>
+                <span>execução geral</span>
               </div>
             </div>
             <div class="hero-side">
               <div>
-                <small>Prioridade em destaque</small>
+                <small>Missão prioritária</small>
                 <strong id="spotlightTitle">-</strong>
               </div>
               <div class="mini-track">
@@ -219,6 +226,32 @@
               <strong id="totalUpdates">0</strong>
             </div>
             <small>histórico preservado</small>
+          </article>
+        </section>
+
+        <section class="intel-grid" aria-label="Inteligência de execução">
+          <article class="cadence-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">RITMO OPERACIONAL</p>
+                <h2>Cadência atual</h2>
+              </div>
+              <strong id="cadencePercent">0%</strong>
+            </div>
+            <p class="panel-copy" id="cadenceCaption">Faça check-ins para formar seu ritmo de preparação.</p>
+            <div class="cadence-track"><span id="cadenceBar" data-fill="0"></span></div>
+            <div class="cadence-metrics" id="cadenceMetrics"></div>
+          </article>
+
+          <article class="activity-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">LOG DE TRAJETÓRIA</p>
+                <h2>Atividade recente</h2>
+              </div>
+              <span class="live-indicator"><i></i> LIVE</span>
+            </div>
+            <div class="activity-feed" id="activityFeed"></div>
           </article>
         </section>
 
@@ -278,10 +311,11 @@
 
     <dialog class="modal" id="goalModal">
       <form class="modal-form" id="newGoalForm" method="dialog">
+        <input name="recordId" type="hidden" />
         <div class="modal-head">
           <div>
-            <p class="eyebrow">NOVO OBJETIVO</p>
-            <h2>Criar objetivo</h2>
+            <p class="eyebrow" id="goalModalEyebrow">NOVO OBJETIVO</p>
+            <h2 id="goalModalTitle">Criar objetivo</h2>
           </div>
           <button class="icon-close" data-close-modal="goalModal" type="button" aria-label="Cancelar">&times;</button>
         </div>
@@ -309,12 +343,26 @@
           </label>
         </div>
         <label>
-          Tipo de acompanhamento
-          <select name="strategy">
-            <option value="total">Acumular entregas (fichamentos, aulas, simulados)</option>
-            <option value="target">Alcançar medição (nota, nível, horas)</option>
-          </select>
+          Diretriz estratégica
+          <textarea name="summary" rows="2" required placeholder="Por que esta meta aproxima você da diplomacia?"></textarea>
         </label>
+        <div class="form-pair">
+          <label>
+            Prioridade
+            <select name="priority">
+              <option value="essencial">Essencial</option>
+              <option value="alta">Alta</option>
+              <option value="constante">Constante</option>
+            </select>
+          </label>
+          <label>
+            Tipo de acompanhamento
+            <select name="strategy">
+              <option value="total">Acumular entregas</option>
+              <option value="target">Alcançar medição</option>
+            </select>
+          </label>
+        </div>
         <div class="form-triple">
           <label>
             Atual
@@ -350,17 +398,18 @@
         </label>
         <div class="modal-actions">
           <button class="ghost-button" data-close-modal="goalModal" type="button">Cancelar</button>
-          <button class="primary-button" type="submit">Criar objetivo</button>
+          <button class="primary-button" id="goalSubmitLabel" type="submit">Criar objetivo</button>
         </div>
       </form>
     </dialog>
 
     <dialog class="modal small" id="routineModal">
       <form class="modal-form" id="newRoutineForm" method="dialog">
+        <input name="recordId" type="hidden" />
         <div class="modal-head">
           <div>
-            <p class="eyebrow">NOVA ROTINA</p>
-            <h2>Criar ritual</h2>
+            <p class="eyebrow" id="routineModalEyebrow">NOVA ROTINA</p>
+            <h2 id="routineModalTitle">Criar ritual</h2>
           </div>
           <button class="icon-close" data-close-modal="routineModal" type="button" aria-label="Cancelar">&times;</button>
         </div>
@@ -383,9 +432,26 @@
         </div>
         <div class="modal-actions">
           <button class="ghost-button" data-close-modal="routineModal" type="button">Cancelar</button>
-          <button class="primary-button" type="submit">Criar rotina</button>
+          <button class="primary-button" id="routineSubmitLabel" type="submit">Criar rotina</button>
         </div>
       </form>
+    </dialog>
+
+    <dialog class="modal small" id="deleteModal">
+      <div class="modal-form">
+        <div class="modal-head">
+          <div>
+            <p class="eyebrow">EXCLUSÃO SEGURA</p>
+            <h2 id="deleteTitle">Excluir item?</h2>
+          </div>
+          <button class="icon-close" data-close-modal="deleteModal" type="button" aria-label="Cancelar">&times;</button>
+        </div>
+        <p class="warning-copy" id="deleteCopy"></p>
+        <div class="modal-actions">
+          <button class="ghost-button" data-close-modal="deleteModal" type="button">Cancelar</button>
+          <button class="danger-button" id="confirmDelete" type="button">Excluir definitivamente</button>
+        </div>
+      </div>
     </dialog>
 
     <dialog class="modal small" id="restoreModal">
